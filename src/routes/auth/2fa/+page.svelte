@@ -1,9 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms'
 
-  import type { ActionData } from './$types'
-
-  export let form: ActionData
+  const { form } = $props()
 </script>
 
 <h1>Two-factor authentication</h1>

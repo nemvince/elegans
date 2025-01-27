@@ -6,7 +6,7 @@
 
 <header>
   <a href="/">Home</a>
-  <a href="/settings">Settings</a>
+  <a href="/auth/settings">Settings</a>
 </header>
 <main>
   <h1>Hi {data.user.username}!</h1>
