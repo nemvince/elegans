@@ -11,6 +11,15 @@ import { generateSessionToken } from '$lib/server/auth/session'
 import { fail, redirect } from '@sveltejs/kit'
 
 import type { Actions, RequestEvent } from './$types'
+import { superValidate } from 'sveltekit-superforms'
+import { zod } from 'sveltekit-superforms/adapters'
+import { formSchema } from './schema'
+
+const load = async () => {
+  return {
+    form: await superValidate(zod(formSchema))
+  }
+}
 
 const ipBucket = new RefillingTokenBucket(3, 60)
 const userBucket = new RefillingTokenBucket(3, 60)
@@ -68,4 +77,4 @@ const actions: Actions = {
   }
 }
 
-export { actions }
+export { load, actions }

@@ -1,12 +1,18 @@
 <script lang="ts">
-  import { enhance } from '$app/forms'
-
-  import { Button } from '$lib/components/ui/button'
+  import * as Form from '$lib/components/ui/form'
   import * as Card from '$lib/components/ui/card'
   import { Input } from '$lib/components/ui/input'
-  import { Label } from '$lib/components/ui/label'
+  import { formSchema, type FormSchema } from './schema'
+  import { type SuperValidated, type Infer, superForm } from 'sveltekit-superforms'
+  import { zodClient } from 'sveltekit-superforms/adapters'
 
-  const { form } = $props()
+  let { data }: { data: { form: SuperValidated<Infer<FormSchema>> } } = $props()
+
+  const form = superForm(data.form, {
+    validators: zodClient(formSchema)
+  })
+
+  const { form: formData, enhance } = form
 </script>
 
 <Card.Root class="max-w-sm">
@@ -16,25 +22,21 @@
   </Card.Header>
   <Card.Content>
     <form method="post" use:enhance>
-      <div class="grid gap-4">
-        <div class="grid gap-2">
-          <Label for="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            name="email"
-            autocomplete="username"
-            required
-            value={form?.email ?? ''}
-          />
-        </div>
-        <Button type="submit" class="w-full">Send</Button>
-      </div>
-      <p>{form?.message ?? ''}</p>
+      <Form.Field {form} name="email">
+        <Form.Control>
+          {#snippet children({ props })}
+            <Form.Label>Email</Form.Label>
+            <Input {...props} bind:value={$formData.email} />
+          {/snippet}
+        </Form.Control>
+        <Form.Description>Enter the email associated with your account.</Form.Description>
+        <Form.FieldErrors />
+      </Form.Field>
+      <Form.Button class="w-full">Send</Form.Button>
     </form>
     <div class="mt-4 text-center text-sm">
       Remembered your password?
-      <a href="/auth/login" class="underline"> Sign in </a>
+      <a href="/auth/login" class="underline">Sign in</a>
     </div>
   </Card.Content>
 </Card.Root>
