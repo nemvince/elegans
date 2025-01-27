@@ -18,7 +18,10 @@
           <Card.Title class="text-2xl">Update email</Card.Title>
         </Card.Header>
         <Card.Content>
-          <p>Your email: {data.user.email}</p>
+          <p class="pb-8">
+            Your email:
+            <span class="font-semibold">{data.user.email}</span>
+          </p>
           <form method="post" use:enhance action="?/email">
             <div class="grid gap-4">
               <div class="grid gap-2">
@@ -91,8 +94,13 @@
             <Card.Title class="text-2xl">Recovery code</Card.Title>
           </Card.Header>
           <Card.Content>
-            <p>Your recovery code is: {data.recoveryCode}</p>
-            <Button>Generate new code</Button>
+            <p>
+              Save this recovery code in a safe place. You can use it to recover your account if you
+              lose access to your two-factor authentication device.
+            </p>
+            <code class="mt-4 grid place-items-center rounded-lg bg-muted py-4 text-xl">
+              {data.recoveryCode}
+            </code>
           </Card.Content>
         </Card.Root>
       </section>
