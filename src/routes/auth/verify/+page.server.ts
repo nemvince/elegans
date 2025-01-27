@@ -117,7 +117,7 @@ const verifyCode = async (event: RequestEvent) => {
   updateUserEmailAndSetEmailAsVerified(event.locals.user.id, verificationRequest.email)
   deleteEmailVerificationRequestCookie(event)
   if (!event.locals.user.registered2FA) {
-    return redirect(302, '/2fa/setup')
+    return redirect(302, '/auth/2fa/setup')
   }
   return redirect(302, '/')
 }
