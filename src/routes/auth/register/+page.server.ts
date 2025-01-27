@@ -1,6 +1,6 @@
-import { fail, redirect } from '@sveltejs/kit'
-import { checkEmailAvailability, verifyEmailInput } from '$lib/server/auth/email'
-import { createUser, verifyUsernameInput } from '$lib/server/auth/user'
+import { redirect } from '@sveltejs/kit'
+import { checkEmailAvailability } from '$lib/server/auth/email'
+import { createUser, checkUsernameAvailability } from '$lib/server/auth/user'
 import { RefillingTokenBucket } from '$lib/server/auth/rateLimit'
 import { verifyPasswordStrength } from '$lib/server/auth/password'
 import {
@@ -16,6 +16,9 @@ import {
 
 import type { SessionFlags } from '$lib/server/auth/session'
 import type { Actions, PageServerLoadEvent, RequestEvent } from './$types'
+import { setError, superValidate } from 'sveltekit-superforms'
+import { zod } from 'sveltekit-superforms/adapters'
+import { formSchema } from './schema'
 
 const ipBucket = new RefillingTokenBucket(3, 10)
 
@@ -32,76 +35,46 @@ const load = async (event: PageServerLoadEvent) => {
     }
     return redirect(302, '/')
   }
-  return {}
+  return {
+    form: await superValidate(zod(formSchema))
+  }
 }
 
 const actions: Actions = {
   default: async (event: RequestEvent) => {
+    const form = await superValidate(event, zod(formSchema))
+
     // TODO: Assumes X-Forwarded-For is always included.
     const clientIP = event.request.headers.get('X-Forwarded-For')
     if (clientIP !== null && !ipBucket.check(clientIP, 1)) {
-      return fail(429, {
-        message: 'Too many requests',
-        email: '',
-        username: ''
-      })
+      return setError(form, 'email', 'Too many requests')
     }
 
-    const formData = await event.request.formData()
-    const email = formData.get('email')
-    const username = formData.get('username')
-    const password = formData.get('password')
-    if (typeof email !== 'string' || typeof username !== 'string' || typeof password !== 'string') {
-      return fail(400, {
-        message: 'Invalid or missing fields',
-        email: '',
-        username: ''
-      })
+    const { email, username, password } = form.data
+
+    if (!form.valid) {
+      return setError(form, 'email', 'Invalid or missing fields')
     }
-    if (email === '' || password === '' || username === '') {
-      return fail(400, {
-        message: 'Please enter your username, email, and password',
-        email: '',
-        username: ''
-      })
-    }
-    if (!verifyEmailInput(email)) {
-      return fail(400, {
-        message: 'Invalid email',
-        email,
-        username
-      })
-    }
+
     const emailAvailable = checkEmailAvailability(email)
     if (!emailAvailable) {
-      return fail(400, {
-        message: 'Email is already used',
-        email,
-        username
-      })
+      return setError(form, 'email', 'Email already in use')
     }
-    if (!verifyUsernameInput(username)) {
-      return fail(400, {
-        message: 'Invalid username',
-        email,
-        username
-      })
+
+    const usernameAvailable = checkUsernameAvailability(username)
+    if (!usernameAvailable) {
+      return setError(form, 'username', 'Username already in use')
     }
+
     const strongPassword = await verifyPasswordStrength(password)
     if (!strongPassword) {
-      return fail(400, {
-        message: 'Weak password',
-        email,
-        username
-      })
+      return setError(form, 'password', 'Password is too weak')
     }
+
     if (clientIP !== null && !ipBucket.consume(clientIP, 1)) {
-      return fail(429, {
-        message: 'Too many requests',
-        email,
-        username
-      })
+      return setError(form, 'email', 'Too many requests')
     }
+
     const user = await createUser(email, username, password)
     const emailVerificationRequest = await createEmailVerificationRequest(user.id, user.email)
     sendVerificationEmail(emailVerificationRequest.email, emailVerificationRequest.code)
@@ -110,6 +83,7 @@ const actions: Actions = {
     const sessionFlags: SessionFlags = {
       twoFactorVerified: false
     }
+
     const sessionToken = generateSessionToken()
     const session = await createSession(sessionToken, user.id, sessionFlags)
     setSessionTokenCookie(event, sessionToken, session.expiresAt)

@@ -8,6 +8,19 @@ const verifyUsernameInput = (username: string): boolean => {
   return username.length > 3 && username.length < 32 && username.trim() === username
 }
 
+const checkUsernameAvailability = async (username: string): Promise<boolean> => {
+  const user = await prisma.user.findUnique({
+    where: {
+      username: username
+    },
+    select: {
+      id: true
+    }
+  })
+
+  return user === null
+}
+
 const createUser = async (email: string, username: string, password: string): Promise<User> => {
   const passwordHash = await hashPassword(password)
   const recoveryCode = generateRandomRecoveryCode()
@@ -189,6 +202,7 @@ const getUserFromEmail = async (email: string): Promise<User | null> => {
 
 export {
   verifyUsernameInput,
+  checkUsernameAvailability,
   createUser,
   updateUserPassword,
   updateUserEmailAndSetEmailAsVerified,
