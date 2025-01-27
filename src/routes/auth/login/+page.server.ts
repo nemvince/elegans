@@ -1,5 +1,4 @@
-import { fail, redirect } from '@sveltejs/kit'
-import { verifyEmailInput } from '$lib/server/auth/email'
+import { redirect } from '@sveltejs/kit'
 import { getUserFromEmail, getUserPasswordHash } from '$lib/server/auth/user'
 import { RefillingTokenBucket, Throttler } from '$lib/server/auth/rateLimit'
 import { verifyPasswordHash } from '$lib/server/auth/password'
@@ -11,8 +10,11 @@ import {
 
 import type { SessionFlags } from '$lib/server/auth/session'
 import type { Actions, PageServerLoadEvent, RequestEvent } from './$types'
+import { setError, superValidate } from 'sveltekit-superforms'
+import { zod } from 'sveltekit-superforms/adapters'
+import { formSchema } from './schema'
 
-const load = (event: PageServerLoadEvent) => {
+const load = async (event: PageServerLoadEvent) => {
   if (event.locals.session !== null && event.locals.user !== null) {
     if (!event.locals.user.emailVerified) {
       return redirect(302, '/auth/verify')
@@ -25,7 +27,9 @@ const load = (event: PageServerLoadEvent) => {
     }
     return redirect(302, '/')
   }
-  return {}
+  return {
+    form: await superValidate(zod(formSchema))
+  }
 }
 
 const throttler = new Throttler([0, 1, 2, 4, 8, 16, 30, 60, 180, 300])
@@ -33,67 +37,45 @@ const ipBucket = new RefillingTokenBucket(20, 1)
 
 const actions: Actions = {
   default: async (event: RequestEvent) => {
+    const form = await superValidate(event, zod(formSchema))
+
     // TODO: Assumes X-Forwarded-For is always included.
     const clientIP = event.request.headers.get('X-Forwarded-For')
     if (clientIP !== null && !ipBucket.check(clientIP, 1)) {
-      return fail(429, {
-        message: 'Too many requests',
-        email: ''
-      })
+      return setError(form, 'email', 'Too many requests')
     }
 
-    const formData = await event.request.formData()
-    const email = formData.get('email')
-    const password = formData.get('password')
-    if (typeof email !== 'string' || typeof password !== 'string') {
-      return fail(400, {
-        message: 'Invalid or missing fields',
-        email: ''
-      })
+    const { email, password } = form.data
+
+    if (!form.valid) {
+      return setError(form, 'email', 'Invalid email or password')
     }
-    if (email === '' || password === '') {
-      return fail(400, {
-        message: 'Please enter your email and password.',
-        email
-      })
-    }
-    if (!verifyEmailInput(email)) {
-      return fail(400, {
-        message: 'Invalid email',
-        email
-      })
-    }
+
     const user = await getUserFromEmail(email)
     if (user === null) {
-      return fail(400, {
-        message: 'Account does not exist',
-        email
-      })
+      return setError(form, 'email', "We couldn't find your account")
     }
+
     if (clientIP !== null && !ipBucket.consume(clientIP, 1)) {
-      return fail(429, {
-        message: 'Too many requests',
-        email: ''
-      })
+      return setError(form, 'email', 'Too many requests')
     }
+
     if (!throttler.consume(user.id)) {
-      return fail(429, {
-        message: 'Too many requests',
-        email: ''
-      })
+      return setError(form, 'email', 'Too many requests')
     }
+
     const passwordHash = await getUserPasswordHash(user.id)
     const validPassword = await verifyPasswordHash(passwordHash, password)
+
     if (!validPassword) {
-      return fail(400, {
-        message: 'Invalid password',
-        email
-      })
+      return setError(form, 'password', 'Invalid password')
     }
+
     throttler.reset(user.id)
     const sessionFlags: SessionFlags = {
       twoFactorVerified: false
     }
+
     const sessionToken = generateSessionToken()
     const session = await createSession(sessionToken, user.id, sessionFlags)
     console.log('Session created:', session)

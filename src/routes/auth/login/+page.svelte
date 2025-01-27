@@ -1,12 +1,18 @@
 <script lang="ts">
-  import { enhance } from '$app/forms'
-
-  import { Button } from '$lib/components/ui/button'
+  import * as Form from '$lib/components/ui/form'
   import * as Card from '$lib/components/ui/card'
   import { Input } from '$lib/components/ui/input'
-  import { Label } from '$lib/components/ui/label'
+  import { formSchema, type FormSchema } from './schema'
+  import { type SuperValidated, type Infer, superForm } from 'sveltekit-superforms'
+  import { zodClient } from 'sveltekit-superforms/adapters'
 
-  const { form } = $props()
+  let { data }: { data: { form: SuperValidated<Infer<FormSchema>> } } = $props()
+
+  const form = superForm(data.form, {
+    validators: zodClient(formSchema)
+  })
+
+  const { form: formData, enhance } = form
 </script>
 
 <Card.Root class="max-w-sm">
@@ -16,40 +22,34 @@
   </Card.Header>
   <Card.Content>
     <form method="post" use:enhance>
-      <div class="grid gap-4">
-        <div class="grid gap-2">
-          <Label for="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            name="email"
-            autocomplete="username"
-            required
-            value={form?.email ?? ''}
-          />
-        </div>
-        <div class="grid gap-2">
-          <div class="flex items-center">
-            <Label for="password">Password</Label>
-            <a href="/auth/forgot" class="ml-auto inline-block text-sm underline">
-              Forgot your password?
-            </a>
-          </div>
-          <Input
-            id="password"
-            type="password"
-            name="password"
-            autocomplete="current-password"
-            required
-          />
-        </div>
-        <Button type="submit" class="w-full">Login</Button>
-      </div>
-      <p>{form?.message ?? ''}</p>
+      <Form.Field {form} name="email">
+        <Form.Control>
+          {#snippet children({ props })}
+            <Form.Label>Email</Form.Label>
+            <Input {...props} bind:value={$formData.email} />
+          {/snippet}
+        </Form.Control>
+        <Form.FieldErrors />
+      </Form.Field>
+
+      <Form.Field {form} name="password">
+        <Form.Control>
+          {#snippet children({ props })}
+            <Form.Label>Password</Form.Label>
+            <Input {...props} type="password" bind:value={$formData.password} />
+          {/snippet}
+        </Form.Control>
+        <Form.FieldErrors />
+      </Form.Field>
+      <Form.Button type="submit" class="mt-4 w-full">Login</Form.Button>
     </form>
-    <div class="mt-4 text-center text-sm">
-      Don't have an account?
-      <a href="/auth/register" class="underline"> Sign up </a>
+
+    <div class="mt-4 flex flex-col gap-3 text-center text-sm">
+      <a href="/auth/forgot" class="underline"> Forgot your password? </a>
+      <span>
+        Don't have an account?
+        <a href="/auth/register" class="underline"> Sign up </a>
+      </span>
     </div>
   </Card.Content>
 </Card.Root>
