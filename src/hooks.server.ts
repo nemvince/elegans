@@ -11,10 +11,9 @@ import type { Handle } from '@sveltejs/kit'
 const bucket = new RefillingTokenBucket(100, 1)
 
 const rateLimitHandle: Handle = async ({ event, resolve }) => {
-  // Note: Assumes X-Forwarded-For will always be defined.
-  const clientIP = event.request.headers.get('X-Forwarded-For')
+  let clientIP = event.request.headers.get('X-Forwarded-For')
   if (clientIP === null) {
-    return resolve(event)
+    clientIP = event.getClientAddress()
   }
   let cost: number
   if (event.request.method === 'GET' || event.request.method === 'OPTIONS') {

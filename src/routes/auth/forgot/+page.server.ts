@@ -26,8 +26,10 @@ const userBucket = new RefillingTokenBucket(3, 60)
 
 const actions: Actions = {
   default: async (event: RequestEvent) => {
-    // TODO: Assumes X-Forwarded-For is always included.
-    const clientIP = event.request.headers.get('X-Forwarded-For')
+    let clientIP = event.request.headers.get('X-Forwarded-For')
+    if (clientIP === null) {
+      clientIP = event.getClientAddress()
+    }
     if (clientIP !== null && !ipBucket.check(clientIP, 1)) {
       return fail(429, {
         message: 'Too many requests',

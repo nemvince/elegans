@@ -39,8 +39,10 @@ const actions: Actions = {
   default: async (event: RequestEvent) => {
     const form = await superValidate(event, zod(formSchema))
 
-    // TODO: Assumes X-Forwarded-For is always included.
-    const clientIP = event.request.headers.get('X-Forwarded-For')
+    let clientIP = event.request.headers.get('X-Forwarded-For')
+    if (clientIP === null) {
+      clientIP = event.getClientAddress()
+    }
     if (clientIP !== null && !ipBucket.check(clientIP, 1)) {
       return setError(form, 'email', 'Too many requests')
     }
