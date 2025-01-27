@@ -2,6 +2,4 @@
   <h1>Hello</h1>
 </header>
 
-<main class="grow bg-purple-400">
-  asdsad
-</main>
+<main class="grow bg-purple-400">asdsad</main>
