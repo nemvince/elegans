@@ -4,7 +4,7 @@
   import { Button } from '$lib/components/ui/button'
   import * as Card from '$lib/components/ui/card'
   import { Label } from '$lib/components/ui/label'
-  import * as InputOTP from '$lib/components/ui/input-otp/index.js'
+  import * as InputOTP from '$lib/components/ui/input-otp'
 
   const { data, form } = $props()
 </script>

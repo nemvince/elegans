@@ -1,12 +1,15 @@
 import { totpBucket } from '$lib/server/auth/2fa'
-import { fail, redirect } from '@sveltejs/kit'
+import { redirect } from '@sveltejs/kit'
 import { getUserTOTPKey } from '$lib/server/auth/user'
 import { verifyTOTP } from '@oslojs/otp'
 import { setSessionAs2FAVerified } from '$lib/server/auth/session'
+import { formSchema } from './schema'
 
 import type { Actions, RequestEvent } from './$types'
+import { setError, superValidate } from 'sveltekit-superforms'
+import { zod } from 'sveltekit-superforms/adapters'
 
-const load = (event: RequestEvent) => {
+const load = async (event: RequestEvent) => {
   if (event.locals.session === null || event.locals.user === null) {
     return redirect(302, '/auth/login')
   }
@@ -20,59 +23,50 @@ const load = (event: RequestEvent) => {
     console.log('Already verified')
     return redirect(302, '/')
   }
-  return {}
+  return {
+    form: await superValidate(zod(formSchema))
+  }
 }
 
 const actions: Actions = {
   default: async (event: RequestEvent) => {
+    const form = await superValidate(event, zod(formSchema))
+
     if (event.locals.session === null || event.locals.user === null) {
-      return fail(401, {
-        message: 'Not authenticated'
-      })
+      return setError(form, 'code', 'Forbidden')
     }
+
     if (
       !event.locals.user.emailVerified ||
       !event.locals.user.registered2FA ||
       event.locals.session.twoFactorVerified
     ) {
-      return fail(403, {
-        message: 'Forbidden'
-      })
-    }
-    if (!totpBucket.check(event.locals.user.id, 1)) {
-      return fail(429, {
-        message: 'Too many requests'
-      })
+      return setError(form, 'code', 'Forbidden')
     }
 
-    const formData = await event.request.formData()
-    const code = formData.get('code')
-    if (typeof code !== 'string') {
-      return fail(400, {
-        message: 'Invalid or missing fields'
-      })
+    if (!totpBucket.check(event.locals.user.id, 1)) {
+      return setError(form, 'code', 'Too many requests')
     }
-    if (code === '') {
-      return fail(400, {
-        message: 'Enter your code'
-      })
+
+    const code = form.data.code
+
+    if (!form.valid) {
+      return setError(form, 'code', 'Invalid code')
     }
+
     if (!totpBucket.consume(event.locals.user.id, 1)) {
-      return fail(429, {
-        message: 'Too many requests'
-      })
+      return setError(form, 'code', 'Too many requests')
     }
+
     const totpKey = await getUserTOTPKey(event.locals.user.id)
     if (totpKey === null) {
-      return fail(403, {
-        message: 'Forbidden'
-      })
+      return setError(form, 'code', 'Invalid code')
     }
+
     if (!verifyTOTP(totpKey, 30, 6, code)) {
-      return fail(400, {
-        message: 'Invalid code'
-      })
+      return setError(form, 'code', 'Invalid code')
     }
+
     totpBucket.reset(event.locals.user.id)
     await setSessionAs2FAVerified(event.locals.session.id)
     return redirect(302, '/')
